@@ -163,13 +163,16 @@ def check_user_balance(message):
 bot.infinity_polling()
 # Admin: View full user info
 @bot.message_handler(commands=['user'])
-def admin_user_info(message):
+def user_info(message):
     if message.chat.id != ADMIN_ID:
         return
 
     try:
-        parts = message.text.strip().split()
-        target_id = parts[1]
+        parts = message.text.split()
+        if len(parts) != 2:
+            raise ValueError("Invalid format")
+
+        target_id = str(parts[1])  # 🔄 এখানে int() নয়, str() হবে
         data = load_data()
 
         if target_id in data:
@@ -177,17 +180,13 @@ def admin_user_info(message):
             bal = user.get('balance', 0)
             ref = user.get('referrals', 0)
             submitted = user.get('submitted', False)
-
-            status = "✅ হ্যাঁ" if submitted else "❌ না"
-
-            msg = (
-                f"👤 ইউজার ID: {target_id}\n"
+            bot.send_message(message.chat.id,
+                f"📊 ইউজার {target_id}:\n"
                 f"💰 ব্যালেন্স: ৳{bal}\n"
                 f"👥 রেফার: {ref}\n"
-                f"📸 স্ক্রিনশট জমা দিয়েছে: {status}"
+                f"📤 স্ক্রিনশট সাবমিট করেছে: {'✅ হ্যাঁ' if submitted else '❌ না'}"
             )
-            bot.send_message(message.chat.id, msg)
         else:
             bot.send_message(message.chat.id, "❌ ইউজার খুঁজে পাওয়া যায়নি।")
     except:
-        bot.send_message(message.chat.id, "⚠️ কমান্ড ভুল!\nসঠিক ব্যবহার: /user <user_id>")
+        bot.send_message(message.chat.id, "⚠️ সঠিক ব্যবহার: /user <user_id>")
