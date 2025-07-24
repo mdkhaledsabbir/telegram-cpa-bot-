@@ -81,17 +81,59 @@ def check_balance(message):
     balance = user.get('balance', 0)
     bot.send_message(message.chat.id, f"💰 আপনার মোট ব্যালেন্স: ৳{balance} টাকা")
 
-# Withdraw
+# Temporary dictionary to hold withdraw steps
+withdraw_data = {}
+
 @bot.message_handler(func=lambda m: m.text == "📨 উইথড্র")
 def withdraw_request(message):
     user_id = str(message.chat.id)
     data = load_data()
     balance = data[user_id]['balance']
-    if balance >= 1000:
-        bot.send_message(message.chat.id, "✅ আপনার উইথড্র রিকোয়েস্ট গ্রহণ করা হয়েছে। এপ্রুভ হলে জানানো হবে।\n📅 পেমেন্ট প্রতিমাসের ৩১ তারিখ দেওয়া হবে।")
-        bot.send_message(ADMIN_ID, f"📨 ইউজার @{message.chat.username or user_id} উইথড্র রিকোয়েস্ট করেছে। ব্যালেন্স: ৳{balance}")
-    else:
+    
+    if balance < 1000:
         bot.send_message(message.chat.id, "❌ উইথড্র এর জন্য কমপক্ষে ৳1000 টাকা থাকতে হবে।")
+        return
+
+    withdraw_data[user_id] = {}
+    msg = bot.send_message(message.chat.id, "👤 আপনার পূর্ণ নাম লিখুন:")
+    bot.register_next_step_handler(msg, process_name)
+
+def process_name(message):
+    user_id = str(message.chat.id)
+    withdraw_data[user_id]['name'] = message.text
+    msg = bot.send_message(message.chat.id, "📞 আপনার মোবাইল নম্বর দিন:")
+    bot.register_next_step_handler(msg, process_number)
+
+def process_number(message):
+    user_id = str(message.chat.id)
+    withdraw_data[user_id]['number'] = message.text
+    markup = types.ReplyKeyboardMarkup(resize_keyboard=True, one_time_keyboard=True)
+    markup.add("বিকাশ", "নগদ", "রকেট")
+    msg = bot.send_message(message.chat.id, "💳 আপনি কোন মেথডে টাকা নিতে চান?", reply_markup=markup)
+    bot.register_next_step_handler(msg, process_method)
+
+def process_method(message):
+    user_id = str(message.chat.id)
+    data = load_data()
+    balance = data[user_id]['balance']
+
+    withdraw_data[user_id]['method'] = message.text
+    name = withdraw_data[user_id]['name']
+    number = withdraw_data[user_id]['number']
+    method = withdraw_data[user_id]['method']
+
+    # Final confirmation to user
+    bot.send_message(message.chat.id, "✅ আপনার উইথড্র রিকোয়েস্ট গ্রহণ করা হয়েছে। এপ্রুভ হলে জানানো হবে।\n📅 পেমেন্ট প্রতিমাসের ৩১ তারিখ দেওয়া হবে।")
+
+    # Notify admin
+    info = f"""📥 নতুন উইথড্র রিকোয়েস্ট:
+👤 নাম: {name}
+📞 নম্বর: {number}
+💳 মেথড: {method}
+💰 ব্যালেন্স: ৳{balance}
+🆔 ইউজার: @{message.chat.username or 'N/A'} ({user_id})"""
+    
+    bot.send_message(ADMIN_ID, info)
 
 # Referral link
 @bot.message_handler(func=lambda m: m.text == "👥 রেফার লিংক")
