@@ -61,7 +61,7 @@ def handle_screenshot(message):
     user_id = str(message.chat.id)
     bot.forward_message(ADMIN_ID, message.chat.id, message.message_id)
     bot.send_message(message.chat.id, "✅ আপনার স্ক্রিনশট গ্রহণ করা হয়েছে। চেক করে এপ্রুভ করা হবে।")
-
+await bot.send_message(admin_id, f"স্ক্রিনশট পাঠিয়েছে:\nName: {message.from_user.full_name}\nUser ID: {message.from_user.id}")
 @bot.message_handler(func=lambda m: m.text == "💸 ব্যালেন্স")
 def check_balance(message):
     user_id = str(message.chat.id)
@@ -84,5 +84,7 @@ def withdraw_request(message):
 @bot.message_handler(func=lambda m: m.text == "👥 রেফার লিংক")
 def referral(message):
     bot.send_message(message.chat.id, f"🔗 আপনার রেফার লিংক:\nhttps://t.me/{bot.get_me().username}?start={message.chat.id}")
-
+await message.reply(
+    f"✅ আপনার রেফার লিংক:\n{ref_link}\n\n💰 প্রতি সফল রেফারে আপনি পাবেন ১০ টাকা!\n\n👫 বন্ধুদের শেয়ার করুন এবং আয় করুন।"
+        )
 bot.infinity_polling()
