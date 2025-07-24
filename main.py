@@ -161,3 +161,33 @@ def check_user_balance(message):
         bot.send_message(message.chat.id, "⚠️ কমান্ড ভুল!\nসঠিক ব্যবহার: /balance <user_id>")
 
 bot.infinity_polling()
+# Admin: View full user info
+@bot.message_handler(commands=['user'])
+def admin_user_info(message):
+    if message.chat.id != ADMIN_ID:
+        return
+
+    try:
+        parts = message.text.strip().split()
+        target_id = parts[1]
+        data = load_data()
+
+        if target_id in data:
+            user = data[target_id]
+            bal = user.get('balance', 0)
+            ref = user.get('referrals', 0)
+            submitted = user.get('submitted', False)
+
+            status = "✅ হ্যাঁ" if submitted else "❌ না"
+
+            msg = (
+                f"👤 ইউজার ID: {target_id}\n"
+                f"💰 ব্যালেন্স: ৳{bal}\n"
+                f"👥 রেফার: {ref}\n"
+                f"📸 স্ক্রিনশট জমা দিয়েছে: {status}"
+            )
+            bot.send_message(message.chat.id, msg)
+        else:
+            bot.send_message(message.chat.id, "❌ ইউজার খুঁজে পাওয়া যায়নি।")
+    except:
+        bot.send_message(message.chat.id, "⚠️ কমান্ড ভুল!\nসঠিক ব্যবহার: /user <user_id>")
