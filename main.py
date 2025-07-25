@@ -72,12 +72,12 @@ def ask_screenshot(message):
     user_id = str(message.chat.id)
     data = load_data()
     user = data.get(user_id, {})
-    submitted = user.get('submitted', 0)
-
-    if submitted >= MAX_SCREENSHOTS:
-        bot.send_message(message.chat.id, f"❌ আপনি ইতোমধ্যে সর্বোচ্চ {MAX_SCREENSHOTS}টি স্ক্রিনশট জমা দিয়েছেন।")
+    # জমা দেয়া স্ক্রিনশট যত আছে সেটা দেখাবে
+    pending = len(user.get('screenshots', []))
+    if pending >= MAX_SCREENSHOTS:
+        bot.send_message(message.chat.id, f"❌ আপনি ইতোমধ্যে সর্বোচ্চ {MAX_SCREENSHOTS}টি স্ক্রিনশট জমা দিয়েছেন, এডমিনের অনুমোদনের জন্য অপেক্ষা করুন।")
         return
-    bot.send_message(message.chat.id, f"📸 দয়া করে স্ক্রিনশট পাঠান ({submitted + 1}/{MAX_SCREENSHOTS})")
+    bot.send_message(message.chat.id, f"📸 দয়া করে স্ক্রিনশট পাঠান ({pending + 1}/{MAX_SCREENSHOTS})")
 
 @bot.message_handler(content_types=['photo'])
 def handle_screenshot(message):
@@ -85,22 +85,22 @@ def handle_screenshot(message):
     data = load_data()
     user = data.get(user_id, {})
 
-    if user.get('submitted', 0) >= MAX_SCREENSHOTS:
-        bot.send_message(message.chat.id, "❌ আপনি সর্বোচ্চ ৩টি স্ক্রিনশট জমা দিয়েছেন।")
+    pending = len(user.get('screenshots', []))
+    if pending >= MAX_SCREENSHOTS:
+        bot.send_message(message.chat.id, "❌ আপনি সর্বোচ্চ ৩টি স্ক্রিনশট জমা দিয়েছেন। এডমিনের অনুমোদনের জন্য অপেক্ষা করুন।")
         return
 
-    # সাবমিট করার সময় এডমিনকে মেসেজ ফরোয়ার্ড করবো Approve বাটনসহ
+    # স্ক্রিনশট জমা হবে
+    user.setdefault('screenshots', []).append(message.photo[-1].file_id)
+    save_data(data)
+
+    # এডমিনকে জানানো হবে
     markup = types.InlineKeyboardMarkup()
     approve_button = types.InlineKeyboardButton("✅ Approve", callback_data=f"approve_{user_id}")
     markup.add(approve_button)
 
-    # এডমিনকে ফরোয়ার্ড করা হলো (স্ক্রিনশটের আসল ছবি না, কিন্তু ইউজারের ID দিয়ে মেসেজ)
-    bot.send_message(ADMIN_ID, f"নতুন স্ক্রিনশট জমা হয়ছে ইউজার ID: {user_id} থেকে। Approve করতে নিচের বাটন চাপুন।", reply_markup=markup)
-
-    user['screenshots'].append(message.photo[-1].file_id)
-    save_data(data)
-
-    bot.send_message(message.chat.id, f"📸 স্ক্রিনশট {len(user['screenshots'])} জমা হয়েছে। এডমিনের অনুমোদনের জন্য অপেক্ষা করুন।")
+    bot.send_message(ADMIN_ID, f"নতুন স্ক্রিনশট জমা হয়েছে ইউজার ID: {user_id} থেকে। Approve করতে নিচের বাটন চাপুন।", reply_markup=markup)
+    bot.send_message(message.chat.id, f"📸 স্ক্রিনশট জমা হয়েছে। এডমিনের অনুমোদনের জন্য অপেক্ষা করুন।")
 
 @bot.callback_query_handler(func=lambda call: call.data.startswith("approve_"))
 def approve_task(call):
@@ -111,13 +111,16 @@ def approve_task(call):
         return
 
     user = data[user_id]
-    if user.get('submitted', 0) >= MAX_SCREENSHOTS:
-        bot.answer_callback_query(call.id, "❌ এই ইউজার সর্বোচ্চ স্ক্রিনশট জমা দিয়েছে।")
+    if not user.get('screenshots'):
+        bot.answer_callback_query(call.id, "❌ এই ইউজারের জন্য অনুমোদনযোগ্য কোনো স্ক্রিনশট নেই।")
         return
 
-    # Approve করলে balance ও submitted বাড়বে
-    user['balance'] += TASK_REWARD
-    user['submitted'] += 1
+    # স্ক্রিনশট থেকে একটা রিমুভ করো (যে স্ক্রিনশট এপ্রুভ হলো)
+    user['screenshots'].pop(0)
+
+    # balance ও submitted বাড়াও
+    user['balance'] = user.get('balance', 0) + TASK_REWARD
+    user['submitted'] = user.get('submitted', 0) + 1
     save_data(data)
 
     bot.answer_callback_query(call.id, "✅ টাস্ক এপ্রুভ হয়েছে।")
@@ -169,7 +172,7 @@ def view_users(message):
     data = load_data()
     msg = "📊 সব ইউজার:\n\n"
     for uid, info in data.items():
-        msg += f"👤 ID: {uid}\n💰 ব্যালেন্স: ৳{info.get('balance', 0)}\n📷 স্ক্রিনশট: {info.get('submitted', 0)}\n👥 রেফার: {info.get('referrals', 0)}\n\n"
+        msg += f"👤 ID: {uid}\n💰 ব্যালেন্স: ৳{info.get('balance', 0)}\n📷 স্ক্রিনশট জমা আছে: {len(info.get('screenshots', []))}\nএপ্রুভড: {info.get('submitted', 0)}\n👥 রেফার: {info.get('referrals', 0)}\n\n"
     bot.send_message(ADMIN_ID, msg[:4000])  # 4000 char limit
 
 @bot.message_handler(func=lambda m: m.text == "🛠️ ইউজার এডিট" and str(m.chat.id) == str(ADMIN_ID))
@@ -194,7 +197,7 @@ def get_user_to_edit(message):
         f"🛠️ ইউজার ID: {target_id}\n"
         f"💰 ব্যালেন্স: {info.get('balance', 0)}\n"
         f"👥 রেফার: {info.get('referrals', 0)}\n"
-        f"📷 স্ক্রিনশট: {info.get('submitted', 0)}\n\n"
+        f"📷 স্ক্রিনশট জমা আছে: {len(info.get('screenshots', []))}\nএপ্রুভড: {info.get('submitted', 0)}\n\n"
         "নতুন ডেটা দিন (format: balance,referrals,submitted)"
     )
     bot.send_message(ADMIN_ID, msg)
@@ -212,7 +215,7 @@ def update_user_info(message):
 
         data = load_data()
         if editing_user_id not in data:
-            return bot.send_message(ADMIN_ID, "❌ ইউজার খুঁজে পাওয়া যায়নি।")
+            return bot.send_message(ADMIN_ID, "❌ ইউজার খুঁজে পাওয়া যাইনি।")
 
         data[editing_user_id]['balance'] = int(lines[0])
         data[editing_user_id]['referrals'] = int(lines[1])
