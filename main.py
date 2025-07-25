@@ -95,7 +95,7 @@ def handle_screenshot(message):
     markup.add(approve_button)
 
     # এডমিনকে ফরোয়ার্ড করা হলো (স্ক্রিনশটের আসল ছবি না, কিন্তু ইউজারের ID দিয়ে মেসেজ)
-    bot.send_message(ADMIN_ID, f"নতুন স্ক্রিনশট জমা হয়েছে ইউজার ID: {user_id} থেকে। Approve করতে নিচের বাটন চাপুন।", reply_markup=markup)
+    bot.send_message(ADMIN_ID, f"নতুন স্ক্রিনশট জমা হয়ছে ইউজার ID: {user_id} থেকে। Approve করতে নিচের বাটন চাপুন।", reply_markup=markup)
 
     user['screenshots'].append(message.photo[-1].file_id)
     save_data(data)
