@@ -222,7 +222,7 @@ def update_user_info(message):
         data[editing_user_id]['submitted'] = int(lines[2])
         save_data(data)
 
-        bot.send_message(ADMIN_ID, f"✅ ইউজার {editing_user_id} আপডেট হয়েছে।")
+        bot.send_message(ADMIN_ID, f"✅ ইউজার {editing_user_id} আপডেট হয়ছে।")
         editing_user_id = None
     except Exception as e:
         bot.send_message(ADMIN_ID, f"❌ Error: {str(e)}")
