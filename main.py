@@ -1,230 +1,66 @@
-import os
-import telebot
-from telebot import types
-import json
+main.py
 
-TOKEN = os.environ.get('TOKEN')
-ADMIN_ID = int(os.environ.get('ADMIN_ID'))
-bot = telebot.TeleBot(TOKEN)
+import os import telebot from telebot import types import json
 
-TASK_REWARD = 30
-REFERRAL_REWARD = 10
-MIN_WITHDRAW = 1000
-MAX_SCREENSHOTS = 3
+TOKEN = os.environ.get('TOKEN') ADMIN_ID = int(os.environ.get('ADMIN_ID')) bot = telebot.TeleBot(TOKEN)
 
-TASKS = {
-    "Task 1": "📌 Pin Submit: https://tinyurl.com/37xxp2an\n🖼 সর্বোচ্চ ৩টি স্ক্রিনশট দিন\n💰 পেমেন্ট: ৳30",
-    "Task 2": "📌 Pin Submit: https://tinyurl.com/4vc76fw5\n🖼 সর্বোচ্চ ৩টি স্ক্রিনশট দিন\n💰 পেমেন্ট: ৳30",
-    "Task 3": "📧 Email Submit: https://tinyurl.com/yyherfxt\n🖼 সর্বোচ্চ ৩টি স্ক্রিনশট দিন\n💰 পেমেন্ট: ৳30",
-    "Task 4": "📧 Email Submit: https://tinyurl.com/25nt96v9\n🖼 সর্বোচ্চ ৩টি স্ক্রিনশট দিন\n💰 পেমেন্ট: ৳30"
-}
+TASK_REWARD = 30 REFERRAL_REWARD = 10 MIN_WITHDRAW = 1000 MAX_SCREENSHOTS = 3
 
-DATA_FILE = 'users.json'
-editing_user_id = None  # Admin user edit tracking
+TASKS = { "Task 1": "📌 Pin Submit: https://tinyurl.com/37xxp2an\n🖼 সবগুলো স্ক্রিনশট দিন\n💰 পেমেন্ট: ৳30", "Task 2": "📌 Pin Submit: https://tinyurl.com/4vc76fw5\n🖼 সবগুলো স্ক্রিনশট দিন\n💰 পেমেন্ট: ৳30", "Task 3": "📧 Email Submit: https://tinyurl.com/yyherfxt\n🖼 সবগুলো স্ক্রিনশট দিন\n💰 পেমেন্ট: ৳30", "Task 4": "📧 Email Submit: https://tinyurl.com/25nt96v9\n🖼 সবগুলো স্ক্রিনশট দিন\n💰 পেমেন্ট: ৳30" }
 
-if not os.path.exists(DATA_FILE):
-    with open(DATA_FILE, 'w') as f:
-        json.dump({}, f)
+DATA_FILE = 'users.json' if not os.path.exists(DATA_FILE): with open(DATA_FILE, 'w') as f: json.dump({}, f)
 
-def load_data():
-    with open(DATA_FILE) as f:
-        return json.load(f)
+editing_user_id = None  # Global variable for admin editing user
 
-def save_data(data):
-    with open(DATA_FILE, 'w') as f:
-        json.dump(data, f)
+Helper Functions
 
-@bot.message_handler(commands=['start'])
-def start(message):
-    user_id = str(message.chat.id)
-    data = load_data()
-    if user_id not in data:
-        data[user_id] = {
-            'referrals': 0,
-            'balance': 0,
-            'submitted': 0,
-            'screenshots': [],
-            'tasks': {}
-        }
-        ref = message.text.split(' ')[1] if len(message.text.split()) > 1 else None
-        if ref and ref in data and ref != user_id:
-            data[ref]['referrals'] += 1
-            data[ref]['balance'] += REFERRAL_REWARD
-            bot.send_message(int(ref), f"🎉 আপনি ১টি রেফারেল পেয়েছেন! প্রতি রেফারে ১০ টাকা পাবে। আপনার ব্যালেন্স এখন: ৳{data[ref]['balance']}")
-    save_data(data)
+def load_data(): with open(DATA_FILE) as f: return json.load(f)
 
-    markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
-    markup.add("📝 টাস্কগুলো", "📤 স্ক্রিনশট জমা", "💸 ব্যালেন্স")
-    markup.add("📨 উইথড্র", "👥 রেফার লিংক", "📘 কাজের নিয়ম")
-    if str(message.chat.id) == str(ADMIN_ID):
-        markup.add("👁️ ইউজার দেখুন", "🛠️ ইউজার এডিট")
-    bot.send_message(message.chat.id, "স্বাগতম! নিচের বাটনগুলো ব্যবহার করুন 👇", reply_markup=markup)
+def save_data(data): with open(DATA_FILE, 'w') as f: json.dump(data, f, indent=2)
 
-@bot.message_handler(func=lambda m: m.text == "📝 টাস্কগুলো")
-def task_list(message):
-    msg = "🔹 বর্তমান টাস্ক:\n\n"
-    for title, link in TASKS.items():
-        msg += f"✅ {title}\n{link}\n\n"
-    bot.send_message(message.chat.id, msg)
+def create_user_if_not_exist(user_id, username, ref=None): data = load_data() if str(user_id) not in data: data[str(user_id)] = { 'username': username, 'balance': 0, 'referrals': [], 'submitted_tasks': [], 'pending_screenshots': [], 'withdraw_requested': False } if ref and str(ref) in data and str(ref) != str(user_id): data[str(ref)]['referrals'].append(user_id) data[str(ref)]['balance'] += REFERRAL_REWARD save_data(data)
 
-@bot.message_handler(func=lambda m: m.text == "📤 স্ক্রিনশট জমা")
-def ask_screenshot(message):
-    user_id = str(message.chat.id)
-    data = load_data()
-    user = data.get(user_id, {})
-    # জমা দেয়া স্ক্রিনশট যত আছে সেটা দেখাবে
-    pending = len(user.get('screenshots', []))
-    if pending >= MAX_SCREENSHOTS:
-        bot.send_message(message.chat.id, f"❌ আপনি ইতোমধ্যে সর্বোচ্চ {MAX_SCREENSHOTS}টি স্ক্রিনশট জমা দিয়েছেন, এডমিনের অনুমোদনের জন্য অপেক্ষা করুন।")
-        return
-    bot.send_message(message.chat.id, f"📸 দয়া করে স্ক্রিনশট পাঠান ({pending + 1}/{MAX_SCREENSHOTS})")
+def get_user_info_text(user_id): data = load_data() user = data.get(str(user_id)) if user: return f"🆔 ID: {user_id}\n👤 Username: @{user['username']}\n💰 Balance: ৳{user['balance']}\n👥 Referrals: {len(user['referrals'])}\n✅ Submitted Tasks: {len(user['submitted_tasks'])}" else: return "❌ ইউজার খুঁজে পাওয়া যায়নি।"
 
-@bot.message_handler(content_types=['photo'])
-def handle_screenshot(message):
-    user_id = str(message.chat.id)
-    data = load_data()
-    user = data.get(user_id, {})
+@bot.message_handler(commands=['start']) def start_handler(message): user_id = message.from_user.id username = message.from_user.username or "NoUsername" ref = None if len(message.text.split()) > 1: ref = message.text.split()[1] create_user_if_not_exist(user_id, username, ref)
 
-    pending = len(user.get('screenshots', []))
-    if pending >= MAX_SCREENSHOTS:
-        bot.send_message(message.chat.id, "❌ আপনি সর্বোচ্চ ৩টি স্ক্রিনশট জমা দিয়েছেন। এডমিনের অনুমোদনের জন্য অপেক্ষা করুন।")
-        return
+markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
+markup.row("🧾 টাস্ক", "📤 স্ক্রিনশট জমা")
+markup.row("💸 উইথড্র", "👥 রেফার")
+if user_id == ADMIN_ID:
+    markup.row("🛠️ ইউজার এডিট", "🧍 ইউজার দেখুন")
+bot.send_message(user_id, "👋 স্বাগতম! আপনি কাজ শুরু করতে পারেন নিচের মেনু থেকে।", reply_markup=markup)
 
-    # স্ক্রিনশট জমা হবে
-    user.setdefault('screenshots', []).append(message.photo[-1].file_id)
-    save_data(data)
+@bot.message_handler(func=lambda m: m.text == "🧾 টাস্ক") def task_list_handler(message): for title, desc in TASKS.items(): bot.send_message(message.chat.id, f"🔸 {title}\n{desc}", parse_mode="Markdown")
 
-    # এডমিনকে জানানো হবে
-    markup = types.InlineKeyboardMarkup()
-    approve_button = types.InlineKeyboardButton("✅ Approve", callback_data=f"approve_{user_id}")
-    markup.add(approve_button)
+@bot.message_handler(func=lambda m: m.text == "📤 স্ক্রিনশট জমা") def ask_for_screenshots(message): bot.send_message(message.chat.id, f"🖼 {MAX_SCREENSHOTS}টি স্ক্রিনশট দিন।") data = load_data() data[str(message.from_user.id)]['pending_screenshots'] = [] save_data(data)
 
-    bot.send_message(ADMIN_ID, f"নতুন স্ক্রিনশট জমা হয়েছে ইউজার ID: {user_id} থেকে। Approve করতে নিচের বাটন চাপুন।", reply_markup=markup)
-    bot.send_message(message.chat.id, f"📸 স্ক্রিনশট জমা হয়েছে। এডমিনের অনুমোদনের জন্য অপেক্ষা করুন।")
+@bot.message_handler(content_types=['photo']) def handle_screenshots(message): user_id = message.from_user.id data = load_data() if str(user_id) not in data: return pending = data[str(user_id)].get('pending_screenshots', []) if len(pending) < MAX_SCREENSHOTS: pending.append(message.photo[-1].file_id) data[str(user_id)]['pending_screenshots'] = pending save_data(data) bot.reply_to(message, f"✅ স্ক্রিনশট {len(pending)}/{MAX_SCREENSHOTS} জমা হয়েছে।")
 
-@bot.callback_query_handler(func=lambda call: call.data.startswith("approve_"))
-def approve_task(call):
-    user_id = call.data.split("_")[1]
-    data = load_data()
-    if user_id not in data:
-        bot.answer_callback_query(call.id, "❌ ইউজার পাওয়া যায়নি।")
-        return
+if len(pending) == MAX_SCREENSHOTS:
+        markup = types.InlineKeyboardMarkup()
+        markup.add(types.InlineKeyboardButton("✅ এপ্রুভ", callback_data=f"approve:{user_id}"))
+        markup.add(types.InlineKeyboardButton("❌ রিজেক্ট", callback_data=f"reject:{user_id}"))
+        for file_id in pending:
+            bot.send_photo(ADMIN_ID, file_id)
+        bot.send_message(ADMIN_ID, f"👤 ইউজার: {user_id} স্ক্রিনশট সাবমিট করেছে।", reply_markup=markup)
 
-    user = data[user_id]
-    if not user.get('screenshots'):
-        bot.answer_callback_query(call.id, "❌ এই ইউজারের জন্য অনুমোদনযোগ্য কোনো স্ক্রিনশট নেই।")
-        return
+@bot.callback_query_handler(func=lambda call: call.data.startswith('approve:')) def approve_task(call): user_id = call.data.split(':')[1] data = load_data() if user_id in data: data[user_id]['balance'] += TASK_REWARD data[user_id]['submitted_tasks'].append(len(data[user_id]['submitted_tasks']) + 1) data[user_id]['pending_screenshots'] = [] save_data(data) bot.send_message(int(user_id), "✅ আপনার কাজটি এপ্রুভ করা হয়েছে।") bot.answer_callback_query(call.id, "টাকা যোগ হয়েছে।")
 
-    # স্ক্রিনশট থেকে একটা রিমুভ করো (যে স্ক্রিনশট এপ্রুভ হলো)
-    user['screenshots'].pop(0)
+@bot.callback_query_handler(func=lambda call: call.data.startswith('reject:')) def reject_task(call): user_id = call.data.split(':')[1] data = load_data() if user_id in data: data[user_id]['pending_screenshots'] = [] save_data(data) bot.send_message(int(user_id), "❌ আপনার টাস্ক ভুল ছিল। আবার চেষ্টা করুন।") bot.answer_callback_query(call.id, "রিজেক্ট করা হয়েছে।")
 
-    # balance ও submitted বাড়াও
-    user['balance'] = user.get('balance', 0) + TASK_REWARD
-    user['submitted'] = user.get('submitted', 0) + 1
-    save_data(data)
+@bot.message_handler(func=lambda m: m.text == "👥 রেফার") def referral_info(message): data = load_data() user = data.get(str(message.from_user.id), {}) ref_link = f"https://t.me/{bot.get_me().username}?start={message.from_user.id}" bot.send_message(message.chat.id, f"👥 রেফার সংখ্যা: {len(user.get('referrals', []))}\n🧾 রেফার প্রতি: ৳10\n📨 আপনার রেফার লিংক:\n{ref_link}")
 
-    bot.answer_callback_query(call.id, "✅ টাস্ক এপ্রুভ হয়েছে।")
-    bot.send_message(user_id, f"🎉 আপনার টাস্ক এপ্রুভ হয়েছে! ৳{TASK_REWARD} আপনার ব্যালেন্সে যোগ হয়েছে।")
+@bot.message_handler(func=lambda m: m.text == "💸 উইথড্র") def withdraw_handler(message): user_id = message.from_user.id data = load_data() user = data.get(str(user_id)) if user['balance'] >= MIN_WITHDRAW: user['withdraw_requested'] = True save_data(data) bot.send_message(message.chat.id, "✅ আপনার উইথড্র রিকোয়েস্ট গ্রহণ করা হয়েছে।\n📲 পেমেন্ট মেথড: bKash, Nagad, Rocket") bot.send_message(ADMIN_ID, f"📤 উইথড্র রিকোয়েস্ট\n🆔: {user_id}\n৳{user['balance']}") else: bot.send_message(message.chat.id, f"❌ উইথড্র করতে হলে কমপক্ষে ৳{MIN_WITHDRAW} প্রয়োজন।")
 
-@bot.message_handler(func=lambda m: m.text == "💸 ব্যালেন্স")
-def check_balance(message):
-    user_id = str(message.chat.id)
-    data = load_data()
-    user = data.get(user_id, {})
-    balance = user.get('balance', 0)
-    referrals = user.get('referrals', 0)
-    bot.send_message(message.chat.id, f"💰 আপনার মোট ব্যালেন্স: ৳{balance}\n👥 রেফার সংখ্যা: {referrals}")
+@bot.message_handler(func=lambda m: m.text == "🧍 ইউজার দেখুন") def ask_for_userid(message): msg = bot.send_message(message.chat.id, "🔍 যে ইউজার আইডি দেখতে চান, দিন:") bot.register_next_step_handler(msg, show_user_info)
 
-@bot.message_handler(func=lambda m: m.text == "📨 উইথড্র")
-def withdraw_request(message):
-    user_id = str(message.chat.id)
-    data = load_data()
-    user = data.get(user_id, {})
-    balance = user.get('balance', 0)
-    if balance >= MIN_WITHDRAW:
-        bot.send_message(message.chat.id, "✅ আপনার উইথড্র রিকোয়েস্ট গ্রহণ করা হয়েছে। এডমিন চেক করে জানাবেন।")
-        bot.send_message(ADMIN_ID, f"📨 @{message.chat.username or message.chat.id} উইথড্র চায়। ব্যালেন্স: ৳{balance}")
-    else:
-        bot.send_message(message.chat.id, f"❌ উইথড্র করতে হলে অন্তত ৳{MIN_WITHDRAW} প্রয়োজন।")
+def show_user_info(message): user_id = message.text.strip() bot.send_message(message.chat.id, get_user_info_text(user_id))
 
-    bot.send_message(message.chat.id, "💳 পেমেন্ট মেথড: bKash | Nagad | Rocket")
+@bot.message_handler(func=lambda m: m.text == "🛠️ ইউজার এডিট") def edit_user_start(message): msg = bot.send_message(message.chat.id, "✏️ যেই ইউজার আইডি এডিট করতে চান, দিন:") bot.register_next_step_handler(msg, ask_balance_edit)
 
-@bot.message_handler(func=lambda m: m.text == "👥 রেফার লিংক")
-def referral(message):
-    bot.send_message(message.chat.id, f"🔗 আপনার রেফার লিংক:\nhttps://t.me/{bot.get_me().username}?start={message.chat.id}")
+def ask_balance_edit(message): global editing_user_id editing_user_id = message.text.strip() msg = bot.send_message(message.chat.id, "💰 নতুন ব্যালেন্স লিখুন:") bot.register_next_step_handler(msg, apply_balance_edit)
 
-@bot.message_handler(func=lambda m: m.text == "📘 কাজের নিয়ম")
-def rules(message):
-    rule_text = (
-        "📌 প্রতিটি টাস্কের জন্য সর্বোচ্চ ৩টি স্ক্রিনশট দিন:\n"
-        "1️⃣ প্রথম ক্লিক করার সময়\n"
-        "2️⃣ এপস/ফর্মে ঢোকার সময়\n"
-        "3️⃣ ইমেইল বা পিন সাবমিট করার পর\n\n"
-        "🖼 এগুলো স্ক্রিনশট বাটনে পাঠান।\n"
-        "✅ যাচাইয়ের পর টাকা অ্যাড করা হবে।"
-    )
-    bot.send_message(message.chat.id, rule_text)
+def apply_balance_edit(message): global editing_user_id try: new_balance = int(message.text.strip()) data = load_data() if editing_user_id in data: data[editing_user_id]['balance'] = new_balance save_data(data) bot.send_message(message.chat.id, "✅ ব্যালেন্স আপডেট হয়েছে।") else: bot.send_message(message.chat.id, "❌ ইউজার খুঁজে পাওয়া যায়নি।") except ValueError: bot.send_message(message.chat.id, "❌ সঠিক সংখ্যা লিখুন।")
 
-# ---------------------- Admin Panel ----------------------
-
-@bot.message_handler(func=lambda m: m.text == "👁️ ইউজার দেখুন" and str(m.chat.id) == str(ADMIN_ID))
-def view_users(message):
-    data = load_data()
-    msg = "📊 সব ইউজার:\n\n"
-    for uid, info in data.items():
-        msg += f"👤 ID: {uid}\n💰 ব্যালেন্স: ৳{info.get('balance', 0)}\n📷 স্ক্রিনশট জমা আছে: {len(info.get('screenshots', []))}\nএপ্রুভড: {info.get('submitted', 0)}\n👥 রেফার: {info.get('referrals', 0)}\n\n"
-    bot.send_message(ADMIN_ID, msg[:4000])  # 4000 char limit
-
-@bot.message_handler(func=lambda m: m.text == "🛠️ ইউজার এডিট" and str(m.chat.id) == str(ADMIN_ID))
-def edit_user_prompt(message):
-    bot.send_message(ADMIN_ID, "✏️ ইউজারের ID দিন যাকে এডিট করতে চান:")
-
-editing_user_id = None  # Track currently editing user
-
-@bot.message_handler(func=lambda m: str(m.chat.id) == str(ADMIN_ID) and m.text.isdigit())
-def get_user_to_edit(message):
-    global editing_user_id
-    target_id = message.text.strip()
-    data = load_data()
-    if target_id not in data:
-        bot.send_message(ADMIN_ID, "❌ ইউজার খুঁজে পাওয়া যায়নি।")
-        editing_user_id = None
-        return
-
-    editing_user_id = target_id
-    info = data[target_id]
-    msg = (
-        f"🛠️ ইউজার ID: {target_id}\n"
-        f"💰 ব্যালেন্স: {info.get('balance', 0)}\n"
-        f"👥 রেফার: {info.get('referrals', 0)}\n"
-        f"📷 স্ক্রিনশট জমা আছে: {len(info.get('screenshots', []))}\nএপ্রুভড: {info.get('submitted', 0)}\n\n"
-        "নতুন ডেটা দিন (format: balance,referrals,submitted)"
-    )
-    bot.send_message(ADMIN_ID, msg)
-
-@bot.message_handler(func=lambda m: str(m.chat.id) == str(ADMIN_ID) and ',' in m.text)
-def update_user_info(message):
-    global editing_user_id
-    if not editing_user_id:
-        bot.send_message(ADMIN_ID, "⚠️ আগে ইউজারের ID দিন।")
-        return
-    try:
-        lines = message.text.strip().split(',')
-        if len(lines) != 3:
-            return bot.send_message(ADMIN_ID, "⚠️ সঠিক ফরম্যাট ব্যবহার করুন: balance,referrals,submitted")
-
-        data = load_data()
-        if editing_user_id not in data:
-            return bot.send_message(ADMIN_ID, "❌ ইউজার খুঁজে পাওয়া যাইনি।")
-
-        data[editing_user_id]['balance'] = int(lines[0])
-        data[editing_user_id]['referrals'] = int(lines[1])
-        data[editing_user_id]['submitted'] = int(lines[2])
-        save_data(data)
-
-        bot.send_message(ADMIN_ID, f"✅ ইউজার {editing_user_id} আপডেট হয়ছে।")
-        editing_user_id = None
-    except Exception as e:
-        bot.send_message(ADMIN_ID, f"❌ Error: {str(e)}")
-
-bot.infinity_polling()
+bot.polling(none_stop=True)
